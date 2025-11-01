@@ -1,0 +1,42 @@
+package middleware
+
+import (
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
+)
+
+// Logger returns a gin.HandlerFunc for logging HTTP requests
+func Logger() gin.HandlerFunc {
+	return gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
+		logrus.WithFields(logrus.Fields{
+			"client_ip":   param.ClientIP,
+			"timestamp":   param.TimeStamp.Format(time.RFC3339),
+			"method":      param.Method,
+			"path":        param.Path,
+			"protocol":    param.Request.Proto,
+			"status_code": param.StatusCode,
+			"latency":     param.Latency,
+			"user_agent":  param.Request.UserAgent(),
+			"error":       param.ErrorMessage,
+		}).Info("HTTP Request")
+
+		return ""
+	})
+}
+
+// Recovery returns a gin.HandlerFunc for recovering from panics
+func Recovery() gin.HandlerFunc {
+	return gin.CustomRecovery(func(c *gin.Context, recovered interface{}) {
+		logrus.WithFields(logrus.Fields{
+			"panic":  recovered,
+			"path":   c.Request.URL.Path,
+			"method": c.Request.Method,
+		}).Error("Panic recovered")
+
+		c.AbortWithStatusJSON(500, gin.H{
+			"error": "Internal server error",
+		})
+	})
+}
