@@ -1,0 +1,61 @@
+# Root .gitignore for Transaction Monitoring Platform
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+*.tmp
+
+# Logs
+*.log
+logs/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build artifacts (root level)
+build/
+dist/
+target/
+
+# Gradle (root level)
+.gradle/
+gradle-app.setting
+!gradle-wrapper.jar
+
+# Node.js (root level)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Docker
+.dockerignore
+
+# Kubernetes secrets
+*.key
+*.crt
+secrets/
+
+# Database
+*.db
+*.sqlite
+
+# Temporary files
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage reports
+coverage/
+*.lcov
+
+# Service-specific ignores are in each service directory

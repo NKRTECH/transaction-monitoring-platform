@@ -1,0 +1,137 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: gtrs-postgres
+    environment:
+      POSTGRES_DB: gtrs_db
+      POSTGRES_USER: gtrs_user
+      POSTGRES_PASSWORD: gtrs_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    networks:
+      - gtrs-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gtrs_user -d gtrs_db"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: gtrs-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - gtrs-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Apache Kafka (for future implementation)
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: gtrs-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - gtrs-network
+    profiles:
+      - kafka
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: gtrs-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+    networks:
+      - gtrs-network
+    profiles:
+      - kafka
+
+  # ClickHouse (for future OLAP implementation)
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.8-alpine
+    container_name: gtrs-clickhouse
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    environment:
+      CLICKHOUSE_DB: gtrs_analytics
+      CLICKHOUSE_USER: gtrs_user
+      CLICKHOUSE_PASSWORD: gtrs_password
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    networks:
+      - gtrs-network
+    profiles:
+      - analytics
+
+  # Prometheus (for monitoring)
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    container_name: gtrs-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    networks:
+      - gtrs-network
+    profiles:
+      - monitoring
+
+  # Grafana (for dashboards)
+  grafana:
+    image: grafana/grafana:10.1.0
+    container_name: gtrs-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    networks:
+      - gtrs-network
+    profiles:
+      - monitoring
+
+volumes:
+  postgres_data:
+  redis_data:
+  clickhouse_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  gtrs-network:
+    driver: bridge
